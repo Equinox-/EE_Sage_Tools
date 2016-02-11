@@ -15,4 +15,4 @@ def SI(val, unit, precision):
         else:
             sig = "-" if (imag(va) < 0) else "+"
             return SI(real(va), "", precision) + " " + sig + " j" + SI(abs(imag(va)), unit, precision)
-    return r"\SI{%s}{%s}" % (va.str(skip_zeroes=1),undoEscape(unit))
+    return r"\SI{%s}{%s}" % (va.str(),undoEscape(unit))

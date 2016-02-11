@@ -6,7 +6,7 @@ def phasorLatex(v, precision):
     return SI_numeric(phasorMag(v), precision).str(skip_zeroes=1) + "\phase{" + SI_numeric(phasorPhase(v)*180/pi, precision).str(skip_zeroes=1) + "^{\circ}}"
 
 def phasorPhase(v):
-    return atan(imag(v)/real(v))
+    return atan2(imag(v),real(v))
 
 def phasorMag(v):
     return sqrt(real(v)^2 + imag(v)^2)
