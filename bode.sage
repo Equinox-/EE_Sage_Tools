@@ -28,7 +28,7 @@ def bodePlot(h, fMin, fMax, **kwargs):
             p *= 180 / pi
         curve1.append((x,n(m)))
         curve2.append((x,n(p)))
-        x *= 1.1
+        x *= step
 
 
     import matplotlib.pyplot as plt
