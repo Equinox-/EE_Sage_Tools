@@ -1,3 +1,31 @@
+# Encapsulate matplotlib figure inside figure
+class MatPlotFigure:
+    def __init__(self, mpl):
+        self.mpl = mpl
+
+    def save(self, filename=None, **kwds):
+        dpi = 100 if not('dpi' in kwds) else round(kwds['dpi'])
+        transparent = ('transparent' in kwds) and bool(kwds['transparent'])
+        fig_tight = not('fig_tight' in kwds) or bool(kwds['fig_tight'])
+
+        if filename is None:
+            from sage.misc.superseded import deprecation
+            deprecation(17234,'the filename argument is now mandatory')
+            from sage.misc.temporary_file import graphics_filename
+            filename = graphics_filename()
+        ext = os.path.splitext(filename)[1].lower()
+
+        from matplotlib import rcParams
+        rc_backup = (rcParams['ps.useafm'], rcParams['pdf.use14corefonts'], rcParams['text.usetex'])
+        mympl = self.mpl
+        mympl.tight_layout()
+
+        opts = dict(dpi=dpi, transparent=transparent)
+        if fig_tight is True:
+            opts['bbox_inches'] = 'tight'
+        mympl.savefig(filename, **opts)
+        (rcParams['ps.useafm'], rcParams['pdf.use14corefonts'], rcParams['text.usetex']) = rc_backup
+
 # Creates a matplotlib instance of the given transfer function.
 def bodePlot(h, fMin, fMax, **kwargs):
     radians = ('radians' in kwargs) and bool(kwargs['radians'])
@@ -31,6 +59,8 @@ def bodePlot(h, fMin, fMax, **kwargs):
         x *= step
 
 
+    import numpy
+    import matplotlib
     import matplotlib.pyplot as plt
     fig = plt.figure()
     # Create the first Y-axis on the left by default and

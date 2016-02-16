@@ -10,3 +10,10 @@ def phasorPhase(v):
 
 def phasorMag(v):
     return sqrt(real(v)^2 + imag(v)^2)
+
+def phasorToTime(phasor, omega, var):
+    return phasorMag(phasor)*cos(omega * var + phasorPhase(phasor))
+
+def phasorToTimeLatex(phasor, omega, precision):
+    phas = phasorPhase(phasor)
+    return SI_numeric(phasorMag(phasor), precision).str(skip_zeroes=1) + "\\cos\\left(" + SI_numeric(omega, precision).str(skip_zeroes=1) + "t " + ("+" if phas > 0 else "-") + " " + SI_numeric(phas, precision).str(skip_zeroes=1) + "\\right)"

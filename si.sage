@@ -1,5 +1,5 @@
 def undoEscape(s):
-    return s.replace("\v", "\\v").replace("\t", "\\t").replace("\a", "\\a").replace("\p", "\\p");
+    return s.replace("\v", "\\v").replace("\t", "\\t").replace("\a", "\\a").replace("\p", "\\p").replace("\f", "\\f").replace("\n", "\\n");
 
 def SI_numeric(val, precision):
     if not(hasattr(val, 'n')):
