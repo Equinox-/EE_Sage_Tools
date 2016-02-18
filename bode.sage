@@ -109,7 +109,6 @@ def bodePlot_func(h, fMin, fMax, **kwargs):
     phase = []
     x = fMin
     while x < fMax:
-        print(x)
         v = evalFn(h, I*x)
         m = phasorMag(v)
         p = phasorPhase(v)
