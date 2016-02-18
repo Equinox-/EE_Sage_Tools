@@ -27,37 +27,29 @@ class MatPlotFigure:
         (rcParams['ps.useafm'], rcParams['pdf.use14corefonts'], rcParams['text.usetex']) = rc_backup
 
 # Creates a matplotlib instance of the given transfer function.
-def bodePlot(h, fMin, fMax, **kwargs):
+def bodePlot_data(freq, mag, phase, **kwargs):
     radians = ('radians' in kwargs) and bool(kwargs['radians'])
-    step = 1.1 if not('step' in kwargs) else float(kwargs['step'])
     decibel = ('decibel' in kwargs) and bool(kwargs['decibel'])
     square = ('square' in kwargs) and bool(kwargs['square'])
     pdb = ('pdb' in kwargs) and bool(kwargs['pdb'])
     decibel |= pdb
     square |= pdb
 
-    if step <= 1:
-        raise Exception("Bad step size")
-    # Let's create two lists with some data
     curve1 = []
     curve2 = []
-    x = fMin
-    while x < fMax:
-        v = evalFn(h, I*x)
-        m = phasorMag(v)
+    for j in xrange(0, len(mag)):
+        m = mag[j]
         if decibel:
             if square:
                 m = m * m
             else:
                 m = abs(m)
             m = 10 * log(m) / log(10)
-        p = phasorPhase(v)
+        p = phase[j]
         if not(radians):
             p *= 180 / pi
-        curve1.append((x,n(m)))
-        curve2.append((x,n(p)))
-        x *= step
-
+        curve1.append((n(freq[j]),n(m)))
+        curve2.append((n(freq[j]),n(p)))
 
     import numpy
     import matplotlib
@@ -107,3 +99,22 @@ def bodePlot(h, fMin, fMax, **kwargs):
 
     # Save the figure (to see it in Sage)
     return plt
+
+def bodePlot_func(h, fMin, fMax, **kwargs):
+    step = 1.1 if not('step' in kwargs) else float(kwargs['step'])
+    if step <= 1:
+        raise Exception("Bad step size")
+    freq = []
+    mag = []
+    phase = []
+    x = fMin
+    while x < fMax:
+        print(x)
+        v = evalFn(h, I*x)
+        m = phasorMag(v)
+        p = phasorPhase(v)
+        freq.append(x)
+        mag.append(m)
+        phase.append(p)
+        x *= step
+    return bodePlot_data(freq, mag, phase, **kwargs)

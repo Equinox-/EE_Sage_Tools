@@ -12,6 +12,9 @@ def evalFn(fn, t):
     if isinstance(fn, sage.symbolic.function.Function):
         return fn(t)
     elif hasattr(fn, '__call__'):
-        return fn({fn.default_variable():t})
+        try:
+            return fn({fn.default_variable():t})
+        except:
+            return fn(t)
     else:
         return fn
