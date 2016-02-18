@@ -9,7 +9,7 @@ def phasorPhase(v):
     return atan2(imag(v),real(v))
 
 def phasorMag(v):
-    return sqrt(real(v)^2 + imag(v)^2)
+    return abs(v)
 
 def phasorToTime(phasor, omega, var):
     return phasorMag(phasor)*cos(omega * var + phasorPhase(phasor))
