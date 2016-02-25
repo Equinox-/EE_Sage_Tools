@@ -32,11 +32,14 @@ def bodePlot_data(freq, mag, phase, **kwargs):
     decibel = ('decibel' in kwargs) and bool(kwargs['decibel'])
     square = ('square' in kwargs) and bool(kwargs['square'])
     pdb = ('pdb' in kwargs) and bool(kwargs['pdb'])
+    angfreq = ('angfreq' in kwargs) and bool(kwargs['angfreq'])
     decibel |= pdb
     square |= pdb
 
-    curve1 = []
-    curve2 = []
+    bodeAmp = []
+    bodePhase = []
+    exPhase = 0
+    lastPhase = 0
     for j in xrange(0, len(mag)):
         m = mag[j]
         if decibel:
@@ -45,11 +48,20 @@ def bodePlot_data(freq, mag, phase, **kwargs):
             else:
                 m = abs(m)
             m = 10 * log(m) / log(10)
-        p = phase[j]
+        p = phase[j] + exPhase
+        while j > 0 and abs(p - lastPhase) > pi:
+            if p < lastPhase:
+                p += 2 * pi
+            else:
+                p -= 2 * pi
+        lastPhase = p
         if not(radians):
             p *= 180 / pi
-        curve1.append((n(freq[j]),n(m)))
-        curve2.append((n(freq[j]),n(p)))
+        f = freq[j]
+        if not(angfreq):
+            f /= 2 * pi
+        bodeAmp.append((n(f),n(m)))
+        bodePhase.append((n(f),n(p)))
 
     import numpy
     import matplotlib
@@ -59,13 +71,16 @@ def bodePlot_data(freq, mag, phase, **kwargs):
     # plot the first curve associated to the left Y-axis
     ax1 = fig.add_subplot(111)
     ax1.set_xscale('log')
-    ax1.set_xlabel('$\omega$')
+    if angfreq:
+        ax1.set_xlabel('$\omega$')
+    else:
+        ax1.set_xlabel('$f$ (Hz)')
     ax1.set_ylabel('$|H(j\omega)|$')
-    curve1_x = zip(*curve1)[0]
-    curve1_y = zip(*curve1)[1]
+    bodeAmp_x = zip(*bodeAmp)[0]
+    bodeAmp_y = zip(*bodeAmp)[1]
     if decibel:
         ax1.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, pos: '%g dB'%x))
-    ax1.plot(curve1_x, curve1_y, '-', color='red')
+    ax1.plot(bodeAmp_x, bodeAmp_y, '-', color='red')
 
     # Paint the tick labels on the left Y-axis in red 
     # to match the color of a curve
@@ -76,17 +91,17 @@ def bodePlot_data(freq, mag, phase, **kwargs):
     # plot the second curve associated to the right Y-axis
     ax2 = ax1.twinx()
     ax2.set_ylabel('$\\angle H(j\omega)$')
-    curve2_x = zip(*curve2)[0]
-    curve2_y = zip(*curve2)[1]
+    bodePhase_x = zip(*bodePhase)[0]
+    bodePhase_y = zip(*bodePhase)[1]
     if not(radians):
-        limMin = floor(min(curve2_y) - .001)
-        limMax = ceil(max(curve2_y) + .001)
+        limMin = floor(min(bodePhase_y) - .001)
+        limMax = ceil(max(bodePhase_y) + .001)
         ax2.set_ylim(limMin, limMax)
         ax2.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, pos: '$%.0f^\circ$'%x))
         count = max(len(ax1.get_ygridlines()) - 1, 1)
         step = ceil((limMax - limMin) / count + .001)
         ax2.yaxis.set_ticks(numpy.arange(limMin, limMax + step, step))
-    ax2.plot(curve2_x, curve2_y, '-', color='blue')
+    ax2.plot(bodePhase_x, bodePhase_y, '--', color='blue')
 
     # Paint the tick labels on the left Y-axis in blue 
     # to match the color of a curve
@@ -101,6 +116,7 @@ def bodePlot_data(freq, mag, phase, **kwargs):
     return plt
 
 def bodePlot_func(h, fMin, fMax, **kwargs):
+    angfreq = ('angfreq' in kwargs) and bool(kwargs['angfreq'])
     step = 1.1 if not('step' in kwargs) else float(kwargs['step'])
     if step <= 1:
         raise Exception("Bad step size")
@@ -109,10 +125,13 @@ def bodePlot_func(h, fMin, fMax, **kwargs):
     phase = []
     x = fMin
     while x < fMax:
-        v = evalFn(h, I*x)
+        f = x
+        if not(angfreq):
+            f *= 2 * n(pi)
+        v = evalFn(h, I*f)
         m = phasorMag(v)
         p = phasorPhase(v)
-        freq.append(x)
+        freq.append(f)
         mag.append(m)
         phase.append(p)
         x *= step

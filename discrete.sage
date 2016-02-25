@@ -214,3 +214,11 @@ class Discrete(object):
 
     def fourier_series_symbolic(self, var):
         return fourier_series_symbolic(self.fourier_series(), len(self), var)
+
+    def fourier_transform(self, var):
+        if self.periodic or not(self[self.left] == 0) or not(self[self.right()] == 0):
+            raise Exception("Periodic or IIR")
+        ss = 0
+        for t in self.xrange():
+            ss += numpy_to_sage(self[t]) * e^(-I*var*t)
+        return ss
