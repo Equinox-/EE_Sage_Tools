@@ -11,6 +11,9 @@ def phasorPhase(v):
 def phasorMag(v):
     return abs(v)
 
+def phasorMag2(v):
+    return sqrt(real(v)^2 + imag(v)^2)
+
 def phasorToTime(phasor, omega, var):
     return phasorMag(phasor)*cos(omega * var + phasorPhase(phasor))
 

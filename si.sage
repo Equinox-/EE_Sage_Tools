@@ -1,7 +1,7 @@
 def undoEscape(s):
-    return s.replace("\v", "\\v").replace("\t", "\\t").replace("\a", "\\a").replace("\p", "\\p").replace("\f", "\\f").replace("\n", "\\n");
+    return s.replace("\v", "\\v").replace("\t", "\\t").replace("\a", "\\a").replace("\p", "\\p").replace("\f", "\\f").replace("\n", "\\n").replace("\r", "\\r");
 
-SI_prefixes = [ [1e-12, "\\pico"], [1e-9, "\\nano"], [1e-6, "\\micro"], [1e-3, "\\milli"], [1, ""], [1e3, "\\kilo"], [1e6, "\\mega"], [1e9, "\\giga"]]
+SI_prefixes = [ [1e-18, "\\atto"], [1e-15, "\\femto"], [1e-12, "\\pico"], [1e-9, "\\nano"], [1e-6, "\\micro"], [1e-3, "\\milli"], [1, ""], [1e3, "\\kilo"], [1e6, "\\mega"], [1e9, "\\giga"], [1e12, "\\tera"], [1e15, "\\peta"], [1e18, "\\exa"]]
 
 def SI_numeric(val, precision):
     if not(hasattr(val, 'n')):
