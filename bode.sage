@@ -60,8 +60,8 @@ def bodePlot_data(freq, mag, phase, **kwargs):
         f = freq[j]
         if not(angfreq):
             f /= 2 * pi
-        bodeAmp.append((n(f),n(m)))
-        bodePhase.append((n(f),n(p)))
+        bodeAmp.append((f.n(), m.n()))
+        bodePhase.append((f.n(), p.n()))
 
     import numpy
     import matplotlib
@@ -127,7 +127,7 @@ def bodePlot_func(h, fMin, fMax, **kwargs):
     while x < fMax:
         f = x
         if not(angfreq):
-            f *= 2 * n(pi)
+            f *= 2 * pi.n()
         v = evalFn(h, I*f)
         m = phasorMag(v)
         p = phasorPhase(v)

@@ -5,10 +5,16 @@ def tfWrap(H):
     return lambda x: phasorMag(evalFn(H, I*x));
 
 def bandPassFreq(H, fMin=bandPassMinFreq, fMax=bandPassMaxFreq):
-    return find_local_maximum(tfWrap(H), fMin, fMax, maxfun=500)[1]
+    return bandPassFreqLam(tfWrap(H), fMin, fMax)
 
 def bandStopFreq(H, fMin=bandPassMinFreq, fMax=bandPassMaxFreq):
-    return find_local_minimum(tfWrap(H), fMin, fMax, maxfun=500)[1]
+    return bandStopFreqLam(tfWrap(H), fMin, fMax)
+
+def bandPassFreqLam(H, fMin=bandPassMinFreq, fMax=bandPassMaxFreq):
+    return find_local_maximum(H, fMin, fMax, maxfun=500)[1]
+
+def bandStopFreqLam(H, fMin=bandPassMinFreq, fMax=bandPassMaxFreq):
+    return find_local_minimum(H, fMin, fMax, maxfun=500)[1]
 
 def bandPassInfo(H, fMin=bandPassMinFreq, fMax=bandPassMaxFreq, center=None):
     omega = var('omega')

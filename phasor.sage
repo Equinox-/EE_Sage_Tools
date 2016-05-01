@@ -1,12 +1,17 @@
 def fromPhasor(mag, phase):
-    rm = sqrt(mag*mag / (1 + tan(phase)^2))
-    return rm + I*tan(phase)*rm
+    return mag*exp(CC(0,1)*phase)
+
+def fromPhasorDeg(mag, phase):
+    return fromPhasor(mag, phase*pi/180)
 
 def phasorLatex(v, precision):
-    return SI_numeric(phasorMag(v), precision).str(skip_zeroes=1) + "\phase{" + SI_numeric(phasorPhase(v)*180/pi, precision).str(skip_zeroes=1) + "^{\circ}}"
+    return SI_str(SI_numeric(phasorMag(v), precision)) + "\phase{" + SI_str(SI_numeric(phasorPhase(v)*180/pi, precision)) + "^{\circ}}"
 
 def phasorPhase(v):
     return atan2(imag(v),real(v))
+
+def phasorPhase2(v):
+    return ln(v / phasorMag(v))
 
 def phasorMag(v):
     return abs(v)
@@ -19,4 +24,9 @@ def phasorToTime(phasor, omega, var):
 
 def phasorToTimeLatex(phasor, omega, precision):
     phas = phasorPhase(phasor)
-    return SI_numeric(phasorMag(phasor), precision).str(skip_zeroes=1) + "\\cos\\left(" + SI_numeric(omega, precision).str(skip_zeroes=1) + "t " + ("+" if phas > 0 else "-") + " " + SI_numeric(phas, precision).str(skip_zeroes=1) + "\\right)"
+    return SI_str(SI_numeric(phasorMag(phasor), precision)) + "\\cos\\left(" + SI_str(SI_numeric(omega, precision)) + "t " + ("+" if phas > 0 else "-") + " " + SI_str(abs(SI_numeric(phas, precision))) + "\\right)"
+
+
+def phasorToTimeLatex2(phasor, precision):
+    phas = phasorPhase(phasor)
+    return SI_str(SI_numeric(phasorMag(phasor), precision)) + "\\cos\\left(\\omega t " + ("+" if phas > 0 else "-") + " " + SI_str(abs(SI_numeric(phas, precision))) + "\\right)"

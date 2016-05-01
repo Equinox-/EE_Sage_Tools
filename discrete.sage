@@ -34,10 +34,10 @@ class Discrete(object):
             if center == None:
                 center = dstFindNonZero(fn)
             right = dstFitTime(fn, 1, center) + 1
-        return Discrete(numpy.array([evalFn(fn, t) for t in xrange(left, right)]), left, periodic)
+        return Discrete(numpy.array([evalFn(fn, t) for t in xrange(left, right)], dtype=object), left, periodic)
 
     def __init__(self, vals, left, periodic = False):
-        self.vals = numpy.array(vals)
+        self.vals = numpy.array(vals, dtype=object)
         self.left = left
         self.periodic = periodic
 
@@ -70,7 +70,7 @@ class Discrete(object):
     def __elementBinaryDD(self, other, fn):
         nl = min(self.left, other.left)
         nr = max(self.right(), other.right())
-        nv = Discrete(numpy.zeros(nr - nl), nl)
+        nv = Discrete(numpy.zeros(nr - nl, dtype=object), nl)
         for v in xrange(nl, nr):
             nv[v] = fn(self[v], other[v])
         return nv
@@ -123,8 +123,16 @@ class Discrete(object):
         else:
             return Discrete(self.vals - other, self.left)
 
+    def subset(self, left, right):
+        out = Discrete(numpy.zeros(right - left, dtype=object), left)
+        for i in out.xrange():
+            out[i] = self[i]
+        return out
+
     def impulses(self, left = None, right = None, **kwargs):
         g = Graphics()
+        shift = 0 if not('shift' in kwargs) else kwargs['shift']
+        scale = 1 if not('scale' in kwargs) else kwargs['scale']
         start = true
         expl = True
         expl = True
@@ -136,26 +144,38 @@ class Discrete(object):
             expl = False
         for i in xrange(left, right):
             if abs(self[i]) > 1e-10 or expl or (i+1 < self.right() and abs(self[i+1]) > 1e-10) or (i > self.left and abs(self[i-1]) > 1e-10):
+                t = shift + scale * i
                 if start:
-                    g += arrow2d((i, 0), (i, self[i]), kwargs)
+                    g += arrow2d((t, 0), (t, self[i]), kwargs)
                     start = false
                 else:
-                    g += arrow2d((i, 0), (i, self[i]))
+                    g += arrow2d((t, 0), (t, self[i]))
         return g
 
-    def points(self):
+    def points(self, **kwargs):
+        shift = 0 if not('shift' in kwargs) else kwargs['shift']
+        scale = 1 if not('scale' in kwargs) else kwargs['scale']
         pts = []
         for i in self.xrange():
-            pts.append((i, self[i]))
+            pts.append((shift + scale*i, self[i]))
         return pts
 
     def convolve(self, other):
         left = self.left + other.left
         right = self.right() + other.right()
-        out = Discrete(numpy.zeros(right - left), left)
+        out = Discrete(numpy.zeros(right - left, dtype=object), left)
         for t in xrange(left, right):
             for k in xrange(self.left - len(self), self.right() + len(self)):
                 out[t] += self[k] * other[t - k]
+        return out
+
+    def convolveSimple(self, other):
+        left = self.left + other.left
+        right = self.right() + other.right()
+        out = Discrete(numpy.zeros(right - left, dtype=object), left)
+        for t in xrange(left, right):
+            for k in self.xrange():
+                out[t] += self[k] * ((other[t - k]) if (t-k) >= other.left and (t-k) < other.right() else 0)
         return out
 
     def nMax(self):
@@ -215,10 +235,41 @@ class Discrete(object):
     def fourier_series_symbolic(self, var):
         return fourier_series_symbolic(self.fourier_series(), len(self), var)
 
-    def fourier_transform(self, var):
-        if self.periodic or not(self[self.left] == 0) or not(self[self.right()] == 0):
-            raise Exception("Periodic or IIR")
-        ss = 0
-        for t in self.xrange():
-            ss += numpy_to_sage(self[t]) * e^(-I*var*t)
-        return ss
+    def fourier_transform(self, svar):
+        if self.periodic:
+            fs = self.fourier_series()
+            return fourier_transform_of_fourier_series(fs, len(self), svar)
+        else:
+            if not(self[self.left] == 0) or not(self[self.right()] == 0):
+                raise Exception("IIR")
+            ss = 0
+            for t in self.xrange():
+                ss += numpy_to_sage(self[t]) * e^(-I*svar*t)
+            return ss
+
+    def n(self, precision):
+        out = self.copy()
+        for n in out.xrange():
+            if not(hasattr(out[n], 'n')):
+                out[n] = ZZ(out[n])
+            out[n] = out[n].n(precision)
+        return out
+
+    def dft(self):
+        N = self.right() - self.left
+        out = [ZZ(0)] * N
+        for k in xrange(0, N):
+            for n in self.xrange():
+                out[k] += self[n]*exp(-I*2*pi*k*n/N)
+        return Discrete(out, 0)
+
+    def idft(self, left=0, right=None):
+        N = self.right() - self.left
+        out = [ZZ(0)] * N
+        if right == None:
+            right = N
+        for n in xrange(left, right):
+            for k in xrange(0, N):
+                out[n - left] += self[k]*exp(I*2*pi*k*n/N)
+            out[n - left] /= N
+        return Discrete(out, left)
