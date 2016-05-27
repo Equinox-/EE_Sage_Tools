@@ -70,6 +70,7 @@ class Discrete(object):
     def __elementBinaryDD(self, other, fn):
         nl = min(self.left, other.left)
         nr = max(self.right(), other.right())
+        print(str(nl) + " to " + str(nr))
         nv = Discrete(numpy.zeros(nr - nl, dtype=object), nl)
         for v in xrange(nl, nr):
             nv[v] = fn(self[v], other[v])
@@ -146,10 +147,10 @@ class Discrete(object):
             if abs(self[i]) > 1e-10 or expl or (i+1 < self.right() and abs(self[i+1]) > 1e-10) or (i > self.left and abs(self[i-1]) > 1e-10):
                 t = shift + scale * i
                 if start:
-                    g += arrow2d((t, 0), (t, self[i]), kwargs)
+                    g += arrow2d((t, 0), (t, abs(self[i])), kwargs)
                     start = false
                 else:
-                    g += arrow2d((t, 0), (t, self[i]))
+                    g += arrow2d((t, 0), (t, abs(self[i])))
         return g
 
     def points(self, **kwargs):

@@ -10,6 +10,9 @@ def numpy_to_sage(v):
     else:
         return CC(v)
 
+def constIneq(s):
+    return isinstance(s, bool) or isinstance(s, numpy.bool_) or (s.lhs().is_constant() and s.rhs().is_constant())
+
 def evalFn(fn, t, var=None):
     if isinstance(fn, sage.symbolic.function.Function):
         return fn(t)
@@ -64,7 +67,7 @@ def roundDecimal(ss, count):
 
 
 def numApproxSR(v, perc):
-    if hasattr(v, "is_constant") and v.is_constant():
+    if hasattr(v, "is_constant") and v.is_constant() and (not(hasattr(v, "is_relational")) or not(v.is_relational())):
         if not(v.is_integer()) or abs(v) > 9999:
             if not(v in RR):
                 v = CC(numApproxSR(real(v), perc), numApproxSR(imag(v), perc))
@@ -79,6 +82,21 @@ def numApproxSR(v, perc):
 
 def stringToTable(string, delim):
     tb=string.replace("\r", "").split("\n")
+    csv=[]
     for i in xrange(0, len(tb)):
-        tb[i] = tb[i].split(delim)
-    return tb
+        if len(tb[i].strip()) > 0:
+            csv.append(tb[i].split(delim))
+    return csv
+
+def readFileFully(path):
+    content = ""
+    with open(path, 'r') as content_file:
+        content = content_file.read()
+    return content
+
+def readCSV(path):
+    table = stringToTable(readFileFully(path), ",")
+    for k in table:
+        for j in xrange(0, len(k)):
+            k[j] = RR(k[j])
+    return table
