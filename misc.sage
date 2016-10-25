@@ -100,3 +100,37 @@ def readCSV(path):
         for j in xrange(0, len(k)):
             k[j] = RR(k[j])
     return table
+
+def fancyDeriv_Newton(v):
+    try:
+        return [fancyDeriv_Newton(x) for x in v]
+    except TypeError:
+        pass
+    if isinstance(v, sage.symbolic.expression.Expression) and v.operator() is not None:
+        if type(v.operator()) == sage.symbolic.operators.FDerivativeOperator:
+            fun = v.operator().function()
+            args = v.operator().parameter_set()
+            import time as tpls
+            fns = 'fnds'+str(floor(tpls.time()*1e3)^^floor(random() * 1e9))
+            pure = latex(fun(*(v.operands()[:])))
+            paren = pure.rfind('\left(')
+            if paren>=0:
+                fname = pure[0:paren]
+                argss = pure[paren:]
+            else:
+                fname = pure
+                argss = ""
+            lat = '\\' + ('d' * len(args)) + 'ot{' + fname + '}' + argss
+            return var(fns, latex_name=lat)
+        else:
+            operands=v.operands()[:]
+            for j in xrange(0, len(operands)):
+                operands[j] = fancyDeriv_Newton(operands[j])
+            v=v.operator()(*operands)
+    return v
+
+def complexToXY(l):
+    o = list()
+    for k in l:
+        o.append((real(k), imag(k)))
+    return o

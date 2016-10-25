@@ -26,6 +26,22 @@ class MatPlotFigure:
         mympl.savefig(filename, **opts)
         (rcParams['ps.useafm'], rcParams['pdf.use14corefonts'], rcParams['text.usetex']) = rc_backup
 
+# Encapsulate tachyon string inside figure
+class TachyonFigure:
+    def __init__(self, mpl):
+        self.mpl = mpl
+
+    def save(self, filename=None, **kwds):
+        tachyon_rt(self.mpl, outfile=filename)
+
+# Workaround for noframe figure
+class Figure3D:
+    def __init__(self, mpl):
+        self.mpl = mpl
+
+    def save(self, filename=None, **kwds):
+        self.mpl.save_image(filename, **kwds)
+
 # Creates a matplotlib instance of the given transfer function.
 def bodePlot_data(freq, mag, phase, **kwargs):
     radians = ('radians' in kwargs) and bool(kwargs['radians'])
