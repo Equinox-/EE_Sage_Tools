@@ -52,33 +52,41 @@ def bodePlot_data(freq, mag, phase, **kwargs):
     decibel |= pdb
     square |= pdb
 
+    multi = isinstance(mag[0], list)
+    channels = len(mag) if multi else 1
+
     bodeAmp = []
     bodePhase = []
-    exPhase = 0
-    lastPhase = 0
-    for j in xrange(0, len(mag)):
-        m = mag[j]
-        if decibel:
-            if square:
-                m = m * m
-            else:
-                m = abs(m)
-            m = 10 * log(m) / log(10)
-        p = phase[j] + exPhase
-        while j > 0 and abs(p - lastPhase) > pi:
-            if p < lastPhase:
-                p += 2 * pi
-            else:
-                p -= 2 * pi
-        lastPhase = p
-        if not(radians):
-            p *= 180 / pi
-        f = freq[j]
-        if not(angfreq):
-            f /= 2 * pi
-        bodeAmp.append((f.n(), m.n()))
-        bodePhase.append((f.n(), p.n()))
+    lastPhase = []
 
+    for l in xrange(0, channels):
+        bodeAmp.append([])
+        bodePhase.append([])
+        lastPhase.append([])
+        magf = mag[l] if multi else mag
+        phasef = phase[l] if multi else phase
+        for j in xrange(0, len(magf)):
+            m = magf[j]
+            if decibel:
+                if square:
+                    m = m * m
+                else:
+                    m = abs(m)
+                m = 10 * log(m) / log(10)
+            p = phasef[j]
+            while j > 0 and abs(p - lastPhase[l]) > pi:
+                if p < lastPhase[l]:
+                    p += 2 * pi
+                else:
+                    p -= 2 * pi
+            lastPhase[l] = p
+            if not(radians):
+                p *= 180 / pi
+            f = freq[j]
+            if not(angfreq):
+                f /= 2 * pi
+            bodeAmp[l].append((f.n(), m.n()))
+            bodePhase[l].append((f.n(), p.n()))
     import numpy
     import matplotlib
     import matplotlib.pyplot as plt
@@ -92,11 +100,13 @@ def bodePlot_data(freq, mag, phase, **kwargs):
     else:
         ax1.set_xlabel('$f$ (Hz)')
     ax1.set_ylabel('$|H(j\omega)|$')
-    bodeAmp_x = zip(*bodeAmp)[0]
-    bodeAmp_y = zip(*bodeAmp)[1]
     if decibel:
         ax1.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, pos: '%g dB'%x))
-    ax1.plot(bodeAmp_x, bodeAmp_y, '-', color='red')
+
+    for l in xrange(0, channels):
+        bodeAmp_x = zip(*(bodeAmp[l]))[0]
+        bodeAmp_y = zip(*(bodeAmp[l]))[1]
+        ax1.plot(bodeAmp_x, bodeAmp_y, '-', color='red')
 
     # Paint the tick labels on the left Y-axis in red 
     # to match the color of a curve
@@ -107,17 +117,22 @@ def bodePlot_data(freq, mag, phase, **kwargs):
     # plot the second curve associated to the right Y-axis
     ax2 = ax1.twinx()
     ax2.set_ylabel('$\\angle H(j\omega)$')
-    bodePhase_x = zip(*bodePhase)[0]
-    bodePhase_y = zip(*bodePhase)[1]
+
+    limMin = 1e10
+    limMax = -1e10
+    for l in xrange(0, channels):
+        bodePhase_x = zip(*(bodePhase[l]))[0]
+        bodePhase_y = zip(*(bodePhase[l]))[1]
+        ax2.plot(bodePhase_x, bodePhase_y, '--', color='blue')
+        if not(radians):
+            limMin = min(limMin, floor(min(bodePhase_y) - .001))
+            limMax = max(limMax, ceil(max(bodePhase_y) + .001))
     if not(radians):
-        limMin = floor(min(bodePhase_y) - .001)
-        limMax = ceil(max(bodePhase_y) + .001)
         ax2.set_ylim(limMin, limMax)
         ax2.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, pos: '$%.0f^\circ$'%x))
         count = max(len(ax1.get_ygridlines()) - 1, 1)
         step = ceil((limMax - limMin) / count + .001)
         ax2.yaxis.set_ticks(numpy.arange(limMin, limMax + step, step))
-    ax2.plot(bodePhase_x, bodePhase_y, '--', color='blue')
 
     # Paint the tick labels on the left Y-axis in blue 
     # to match the color of a curve
@@ -136,6 +151,9 @@ def bodePlot_func(h, fMin, fMax, **kwargs):
     step = 1.1 if not('step' in kwargs) else float(kwargs['step'])
     if step <= 1:
         raise Exception("Bad step size")
+    multi = isinstance(h, list)
+    channels = len(h) if multi else 1
+
     freq = []
     mag = []
     phase = []
@@ -144,11 +162,16 @@ def bodePlot_func(h, fMin, fMax, **kwargs):
         f = x
         if not(angfreq):
             f *= 2 * pi.n()
-        v = evalFn(h, I*f)
-        m = phasorMag(v)
-        p = phasorPhase(v)
         freq.append(f)
-        mag.append(m)
-        phase.append(p)
         x *= step
+
+    for j in xrange(0, channels):
+        mag.append([])
+        phase.append([])
+        for i in xrange(0, len(freq)):
+            v = evalFn(h[j] if multi else h, I*freq[i])
+            m = phasorMag(v)
+            p = phasorPhase(v)
+            mag[j].append(m)
+            phase[j].append(p)
     return bodePlot_data(freq, mag, phase, **kwargs)
