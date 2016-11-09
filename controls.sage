@@ -42,17 +42,28 @@ def normalizeTransfer(top, bottom, v):
     return ring((top/f).coefficients(s, sparse=False)) / ring((bottom/f).coefficients(s, sparse=False))
 
 def zerosInternal(f, v):
+    if hasattr(f, 'roots'):
+        rrr=f.roots()
+        out = list()
+        for k,v in rrr:
+            for j in xrange(0, v):
+                out.append(k)
+        return out
     solus = solve(f==0, v, solution_dict=true)
     out = list()
     for s in solus:
         out.append(s[v])
     return out
 
-def tsPoles(ts):
-    return zerosInternal(ts.denominator(), ts.default_variable())
+def tsPoles(ts, vs=None):
+    if vs == None:
+        vs = ts.default_variable()
+    return zerosInternal(ts.denominator(), vs)
 
-def tsZeros(ts):
-    return zerosInternal(ts.numerator(), ts.default_variable())
+def tsZeros(ts, vs=None):
+    if vs == None:
+        vs = ts.default_variable()
+    return zerosInternal(ts.numerator(), vs)
 
 def tsPoleZero(ts, **kwargs):
     label = kwargs.get('label', None)
