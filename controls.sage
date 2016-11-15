@@ -41,18 +41,27 @@ def normalizeTransfer(top, bottom, v):
     ring=PolynomialRing(SR, v)
     return ring((top/f).coefficients(s, sparse=False)) / ring((bottom/f).coefficients(s, sparse=False))
 
-def zerosInternal(f, v):
+def zerosInternal(f, v, **kwargs):
+    numeric = kwargs['numeric'] if 'numeric' in kwargs else False
     if hasattr(f, 'roots'):
-        rrr=f.roots()
-        out = list()
-        for k,v in rrr:
-            for j in xrange(0, v):
-                out.append(k)
-        return out
+        try:
+            rrr=f.roots()
+            out = list()
+            for k,v in rrr:
+                for j in xrange(0, v):
+                    if numeric:
+                        k=n(k)
+                    out.append(k)
+            return out
+        except:
+            pass
     solus = solve(f==0, v, solution_dict=true)
     out = list()
     for s in solus:
-        out.append(s[v])
+        if numeric:
+            out.append(n(s[v]))
+        else:
+            out.append(s[v])
     return out
 
 def tsPoles(ts, vs=None):
@@ -110,6 +119,113 @@ def desolve_SS(tvar, U, A, B, C, D, **kwargs):
             outs.append(pts)
         return outs
     return tout, out
+
+def evans(expr, kMax=None, accuracy=1):
+    import itertools
+
+    # limits
+    smax=.002/accuracy
+    smin=smax/3
+    stepMin = 1e-15/accuracy
+    iterMax=20000
+
+    va = expr.default_variable()
+    n = expr.numerator()
+    d = expr.denominator()
+    if kMax == None:
+        kMax = round(500 * vector(SR(d).coefficients(s, sparse=False)).norm() / vector(SR(n).coefficients(s, sparse=False)).norm())
+
+    vzeros = zerosInternal(n, va)
+    vpoles = zerosInternal(d, va)
+    if len(vzeros) + len(vpoles) == 0:
+        raise ValueError("No poles or zeros")
+
+    nrm = 2.0 * max([abs(v) for v in vzeros] + [abs(v) for v in vpoles])
+    md = d.degree(va)
+
+    kv = 1e-4
+    step = 1
+    itr = 0
+
+    routeCount = 0
+    poleRoutes = {}
+    # initialize poleRoutes @ k=0
+    extent = 0
+
+    kPoles = zerosInternal(d, va, numeric=True)
+    for v in kPoles:
+        extent = max(extent, v)
+        poleRoutes[routeCount] = [v]
+        routeCount += 1
+
+    while kv <= kMax and itr < iterMax:
+        kPoles = zerosInternal(d+kv*n, va, numeric=True)
+        # map poles to routes
+        kRoutes = None
+        kRouteErr = None
+        # brute force the best match every time
+        for perm in itertools.permutations(range(0, len(kPoles))):
+            kTmpRoutes = {}
+            kTmpRouteErr = 0
+            for i in xrange(0, len(perm)):
+                j = perm[i]
+                # pole i maps to route j
+                if j in poleRoutes:
+                    # raw distance
+                    kMyErr = abs(poleRoutes[j][-1] - kPoles[i])
+
+                    # dist of midpoint from line connecting self and self-2
+                    if len(poleRoutes[j]) >= 2:
+                        pt1 = kPoles[i]
+                        pt2 = poleRoutes[j][-2]
+                        test = poleRoutes[j][-1]
+                        dx=real(pt2)-real(pt1)
+                        dy=imag(pt2)-imag(pt1)
+                        
+                        dxt=real(pt1)-real(test)
+                        dyt=imag(pt1)-imag(test)
+
+                        midLineDistance = abs(dx * dyt - dy * dxt) / kMyErr
+                        kMyErr = (midLineDistance * 1e3) + (kMyErr / 3e1)
+                    kTmpRouteErr = max(kTmpRouteErr, kMyErr)
+                kTmpRoutes[j] = kPoles[i]
+            if kRoutes == None or kTmpRouteErr < kRouteErr:
+                kRouteErr = kTmpRouteErr
+                kRoutes = kTmpRoutes
+        kRouteErr /= nrm
+
+        #print(str(kv) + "/" + str(kMax) + "\t\t" + str(kRouteErr) + "\t" + str(step) + "\t" + str([poleRoutes[k][-1] for k in poleRoutes]))
+        # check err
+        if kRouteErr > smax and step > stepMin:
+            step = max(stepMin, step / 2e0)
+        else:
+            if kRouteErr < smin:
+                step *= 2e0
+            for k in kRoutes:
+                v=kRoutes[k]
+                extent = max(extent, abs(v))
+                routeCount = max(routeCount, k+1)
+                if k in poleRoutes:
+                    poleRoutes[k].append(v)
+                else:
+                    poleRoutes[k] = [v]
+            kv += step
+        itr = itr + 1
+
+    g = tsPoleZero(n/d)
+    for k in poleRoutes:
+        g += line(complexToXY(poleRoutes[k]))
+
+    # draw asmyptotes
+    asymLen = extent * 1.4
+    count = len(vpoles) - len(vzeros)
+    if count > 0:
+        sigma = (sum(vpoles) - sum(vzeros)) / count
+        for pole in xrange(0, count):
+            theta = pi * (1 + 2*pole) / count
+            g += line([(real(sigma), imag(sigma)), (real(sigma) + cos(theta) * asymLen, imag(sigma) + sin(theta) * asymLen)], linestyle='--', color='red')
+
+    return g
 
 class ControlSystem:
     def __init__(self, tv, sv, *args):
