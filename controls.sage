@@ -120,7 +120,7 @@ def desolve_SS(tvar, U, A, B, C, D, **kwargs):
         return outs
     return tout, out
 
-def evans(expr, kMax=None, accuracy=1):
+def evans(expr, kMax=None, accuracy=1, extra=0):
     import itertools
 
     # limits
@@ -139,6 +139,9 @@ def evans(expr, kMax=None, accuracy=1):
     vpoles = zerosInternal(denom, va, numeric=True)
     if len(vzeros) + len(vpoles) == 0:
         raise ValueError("No poles or zeros")
+
+    print("Zeros " + str(vzeros))
+    print("Poles " + str(vpoles))
 
     nrm = 2.0 * max([abs(v) for v in vzeros] + [abs(v) for v in vpoles])
     md = denom.degree(va)
@@ -222,19 +225,35 @@ def evans(expr, kMax=None, accuracy=1):
         itr = itr + 1
 
     g = Graphics()
-    g += tsPoleZero(numer/denom)
+    g += tsPoleZero(numer/denom, size=50)
     for k in poleRoutes:
-        g += line(complexToXY(poleRoutes[k]))
+        g += line(complexToXY(poleRoutes[k]), color='blue', thickness=2)
 
     # draw asmyptotes
-    asymLen = nrm
+    asymLen = abs(nrm) * (1+extra) * 10
     count = len(vpoles) - len(vzeros)
+    print(str(count) + " asymptotes")
     if count > 0:
         sigma = (sum(vpoles) - sum(vzeros)) / count
+        print("asymptotes start at v=" + str(sigma))
         for pole in xrange(0, count):
             theta = pi * (1 + 2*pole) / count
-            g += line([(real(sigma), imag(sigma)), (real(sigma) + cos(theta) * asymLen, imag(sigma) + sin(theta) * asymLen)], linestyle='--', color='red', thickness=6)
-    g.axes_range(-nrm, nrm, -nrm, nrm)
+            path = [(real(sigma), imag(sigma)), (real(sigma) + cos(theta) * asymLen, imag(sigma) + sin(theta) * asymLen)]
+            print(str(pole) + " asymp @ " + str(theta) + "\t" + str(path))
+            g += line(path, linestyle='--', color='red', thickness=4)
+    # compute bounds:
+    vr = []
+    vi = []
+    for k in poleRoutes:
+        vr += [real(v) for v in poleRoutes[k]]
+        vi += [imag(v) for v in poleRoutes[k]]
+    vrmax = max(vr)
+    vrmin = min(vr)
+    vimax = max(vi)
+    vimin = min(vi)
+    vrr = vrmax - vrmin
+    vir = vimax - vimin
+    g.axes_range(max(-nrm * (1+extra), vrmin - vrr * extra), min(nrm * (1+extra), vrmax + vrr * extra), max(-nrm * (1+extra), vimin - vir * extra), min(nrm * (1+extra), vimax + vir * extra))
     return g
 
 class ControlSystem:
