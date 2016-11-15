@@ -124,42 +124,41 @@ def evans(expr, kMax=None, accuracy=1):
     import itertools
 
     # limits
-    smax=.002/accuracy
+    smax=.002/(accuracy)
     smin=smax/3
-    stepMin = 1e-15/accuracy
+    stepMin = 1e-15/(accuracy*accuracy)
     iterMax=20000
 
     va = expr.default_variable()
-    n = expr.numerator()
-    d = expr.denominator()
+    numer = expr.numerator()
+    denom = expr.denominator()
     if kMax == None:
-        kMax = round(500 * vector(SR(d).coefficients(s, sparse=False)).norm() / vector(SR(n).coefficients(s, sparse=False)).norm())
+        kMax = round(n(500 * vector(SR(denom).coefficients(s, sparse=False)).norm() / vector(SR(numer).coefficients(s, sparse=False)).norm()))
 
-    vzeros = zerosInternal(n, va)
-    vpoles = zerosInternal(d, va)
+    vzeros = zerosInternal(numer, va, numeric=True)
+    vpoles = zerosInternal(denom, va, numeric=True)
     if len(vzeros) + len(vpoles) == 0:
         raise ValueError("No poles or zeros")
 
     nrm = 2.0 * max([abs(v) for v in vzeros] + [abs(v) for v in vpoles])
-    md = d.degree(va)
+    md = denom.degree(va)
 
-    kv = 1e-4
-    step = 1
+    kcurr = 0
+    step = stepMin
     itr = 0
 
     routeCount = 0
     poleRoutes = {}
     # initialize poleRoutes @ k=0
-    extent = 0
 
-    kPoles = zerosInternal(d, va, numeric=True)
+    kPoles = zerosInternal(denom, va, numeric=True)
     for v in kPoles:
-        extent = max(extent, v)
         poleRoutes[routeCount] = [v]
         routeCount += 1
 
-    while kv <= kMax and itr < iterMax:
-        kPoles = zerosInternal(d+kv*n, va, numeric=True)
+    while kcurr <= kMax and itr < iterMax:
+        knext = kcurr + step
+        kPoles = zerosInternal(denom+knext*numer, va, numeric=True)
         # map poles to routes
         kRoutes = None
         kRouteErr = None
@@ -173,28 +172,39 @@ def evans(expr, kMax=None, accuracy=1):
                 if j in poleRoutes:
                     # raw distance
                     kMyErr = abs(poleRoutes[j][-1] - kPoles[i])
-
-                    # dist of midpoint from line connecting self and self-2
-                    if len(poleRoutes[j]) >= 2:
-                        pt1 = kPoles[i]
-                        pt2 = poleRoutes[j][-2]
-                        test = poleRoutes[j][-1]
-                        dx=real(pt2)-real(pt1)
-                        dy=imag(pt2)-imag(pt1)
-                        
-                        dxt=real(pt1)-real(test)
-                        dyt=imag(pt1)-imag(test)
-
-                        midLineDistance = abs(dx * dyt - dy * dxt) / kMyErr
-                        kMyErr = (midLineDistance * 1e3) + (kMyErr / 3e1)
-                    kTmpRouteErr = max(kTmpRouteErr, kMyErr)
+                    kTmpRouteErr += kMyErr
+                else:
+                    # static cost for generating new routes
+                    kTmpRouteErr += 1e3
                 kTmpRoutes[j] = kPoles[i]
             if kRoutes == None or kTmpRouteErr < kRouteErr:
                 kRouteErr = kTmpRouteErr
                 kRoutes = kTmpRoutes
+
+        # now that we picked a matching set use the midpoint distance for a graphical step size error
+        kRouteErr = 0
+        for j in kRoutes:
+            if j in poleRoutes:
+                # raw distance
+                kMyErr = abs(poleRoutes[j][-1] - kRoutes[j])
+
+                # dist of midpoint from line connecting self and self-2
+                if len(poleRoutes[j]) >= 2:
+                    pt1 = kRoutes[j]
+                    pt2 = poleRoutes[j][-2]
+                    test = poleRoutes[j][-1]
+                    dx=n(real(pt2)-real(pt1))
+                    dy=n(imag(pt2)-imag(pt1))
+                       
+                    dxt=n(real(pt1)-real(test))
+                    dyt=n(imag(pt1)-imag(test))
+
+                    midLineDistance = n(abs(dx * dyt - dy * dxt) / kMyErr)
+                    kMyErr = n((midLineDistance * 1e3) + (kMyErr / 1e2))
+                kRouteErr = max(kRouteErr, kMyErr)
         kRouteErr /= nrm
 
-        #print(str(kv) + "/" + str(kMax) + "\t\t" + str(kRouteErr) + "\t" + str(step) + "\t" + str([poleRoutes[k][-1] for k in poleRoutes]))
+        print(str(kcurr) + " + " + str(step) + " = " + str(knext) + "\t\terr=" + str(kRouteErr) + "\t" + str([poleRoutes[k][-1] for k in poleRoutes]))
         # check err
         if kRouteErr > smax and step > stepMin:
             step = max(stepMin, step / 2e0)
@@ -203,28 +213,28 @@ def evans(expr, kMax=None, accuracy=1):
                 step *= 2e0
             for k in kRoutes:
                 v=kRoutes[k]
-                extent = max(extent, abs(v))
                 routeCount = max(routeCount, k+1)
                 if k in poleRoutes:
                     poleRoutes[k].append(v)
                 else:
                     poleRoutes[k] = [v]
-            kv += step
+            kcurr = knext
         itr = itr + 1
 
-    g = tsPoleZero(n/d)
+    g = Graphics()
+    g += tsPoleZero(numer/denom)
     for k in poleRoutes:
         g += line(complexToXY(poleRoutes[k]))
 
     # draw asmyptotes
-    asymLen = extent * 1.4
+    asymLen = nrm
     count = len(vpoles) - len(vzeros)
     if count > 0:
         sigma = (sum(vpoles) - sum(vzeros)) / count
         for pole in xrange(0, count):
             theta = pi * (1 + 2*pole) / count
-            g += line([(real(sigma), imag(sigma)), (real(sigma) + cos(theta) * asymLen, imag(sigma) + sin(theta) * asymLen)], linestyle='--', color='red')
-
+            g += line([(real(sigma), imag(sigma)), (real(sigma) + cos(theta) * asymLen, imag(sigma) + sin(theta) * asymLen)], linestyle='--', color='red', thickness=6)
+    g.axes_range(-nrm, nrm, -nrm, nrm)
     return g
 
 class ControlSystem:
@@ -387,11 +397,12 @@ class ControlSystem:
             F[v] = k
         return (matrix(mat_A), vector(X), matrix(mat_B), vector(F))
 
-def rootLocusInfo(CGH):
+def rootLocusInfo(CGH, ret=False):
+    rets = ""
     poles = tsPoles(CGH)
     zeros = tsZeros(CGH)
-    print("Poles: " + str([roundDecimal(str(n(v)), 2) for v in poles]))
-    print("Zeros: " + str([roundDecimal(str(n(v)), 2) for v in zeros]))
+    rets += ("Poles: " + str([roundDecimal(str(n(v)), 2) for v in poles])) + "\n"
+    rets += ("Zeros: " + str([roundDecimal(str(n(v)), 2) for v in zeros])) + "\n"
     reps = [real(n(v)) for v in poles] + [real(n(v)) for v in zeros]
     reps.sort()
     if ((len(reps) % 2) == 1):
@@ -400,11 +411,14 @@ def rootLocusInfo(CGH):
     while j < len(reps) - 1:
         if reps[j] == reps[j+1]:
             del reps[j]
-            del reps[j+1]
+            del reps[j]
         else:
             j = j+1
-    print("Real Parts: " + str([(roundDecimal(str(n(reps[v])), 2), roundDecimal(str(n(reps[v+1])), 2)) for v in xrange(0, len(reps), 2)]))
+    rets += ("Real Parts: " + str([(roundDecimal(str(n(reps[v])), 2), roundDecimal(str(n(reps[v+1])), 2)) for v in xrange(0, len(reps), 2)])) + "\n"
     asym = len(poles) - len(zeros)
-    print("Asmyptotes: " + str(asym))
-    print("Asymptote X: " + str((sum(poles) - sum(zeros)) / asym))
-    print("Asmyptote Theta: " + str([roundDecimal(str(n((180*(1+2*m)/asym) % 360)), 2) for m in xrange(1, 1+asym)])
+    rets += ("Asmyptotes: " + str(asym)) + "\n"
+    rets += ("Asymptote X: " + str((sum(poles) - sum(zeros)) / asym)) + "\n"
+    rets += ("Asmyptote Theta: " + str([roundDecimal(str(n((180*(1+2*m)/asym) % 360)), 2) for m in xrange(1, 1+asym)])) + "\n"
+    if not(ret):
+        print(rets)
+    return rets
