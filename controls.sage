@@ -386,3 +386,25 @@ class ControlSystem:
         for k, v in FV.iteritems():
             F[v] = k
         return (matrix(mat_A), vector(X), matrix(mat_B), vector(F))
+
+def rootLocusInfo(CGH):
+    poles = tsPoles(CGH)
+    zeros = tsZeros(CGH)
+    print("Poles: " + str([roundDecimal(str(n(v)), 2) for v in poles]))
+    print("Zeros: " + str([roundDecimal(str(n(v)), 2) for v in zeros]))
+    reps = [real(n(v)) for v in poles] + [real(n(v)) for v in zeros]
+    reps.sort()
+    if ((len(reps) % 2) == 1):
+        reps = [-infinity] + reps
+    j = 0
+    while j < len(reps) - 1:
+        if reps[j] == reps[j+1]:
+            del reps[j]
+            del reps[j+1]
+        else:
+            j = j+1
+    print("Real Parts: " + str([(roundDecimal(str(n(reps[v])), 2), roundDecimal(str(n(reps[v+1])), 2)) for v in xrange(0, len(reps), 2)]))
+    asym = len(poles) - len(zeros)
+    print("Asmyptotes: " + str(asym))
+    print("Asymptote X: " + str((sum(poles) - sum(zeros)) / asym))
+    print("Asmyptote Theta: " + str([roundDecimal(str(n((180*(1+2*m)/asym) % 360)), 2) for m in xrange(1, 1+asym)])
