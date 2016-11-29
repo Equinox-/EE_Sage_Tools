@@ -295,7 +295,7 @@ def evans(expr, kMax=None, accuracy=1, extra=0, **kwargs):
     g = Graphics()
     g += tsPoleZero(numer/denom, size=50)
     for k in poleRoutes:
-        g += line(complexToXY(poleRoutes[k]['v']), color='blue', thickness=2)
+        g += line(complexToXY(poleRoutes[k]['v']), color='blue', thickness=1)
 
     # draw asmyptotes
     asymLen = abs(nrm) * (1+extra) * 10
@@ -311,7 +311,7 @@ def evans(expr, kMax=None, accuracy=1, extra=0, **kwargs):
             path = [(real(sigma), imag(sigma)), (real(sigma) + cos(theta) * asymLen, imag(sigma) + sin(theta) * asymLen)]
             if debug:
                 print(str(pole) + " asymp @ " + str(theta) + "\t" + str(path))
-            g += line(path, linestyle='--', color='red', thickness=4)
+            g += line(path, linestyle=':', color='red', thickness=2)
     # compute bounds:
     vr = []
     vi = []
