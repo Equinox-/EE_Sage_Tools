@@ -65,12 +65,12 @@ def zerosInternal(f, v, **kwargs):
     return out
 
 def tsPoles(ts, vs=None):
-    if vs == None:
+    if vs == None and hasattr(ts, 'default_variable'):
         vs = ts.default_variable()
     return zerosInternal(ts.denominator(), vs)
 
 def tsZeros(ts, vs=None):
-    if vs == None:
+    if vs == None and hasattr(ts, 'default_variable'):
         vs = ts.default_variable()
     return zerosInternal(ts.numerator(), vs)
 
@@ -87,14 +87,59 @@ def tsPoleZero(ts, **kwargs):
             plt += sage.plot.text.text(label, (real(p), imag(p)), horizontal_alignment='left', vertical_alignment='top', **kwargs)
     return plt
 
+def tf2SS(ts, **kwargs):
+    va = kwargs['va'] if 'va' in kwargs else ts.default_variable()
+    num = ts.numerator().coefficients(va, sparse=False)
+    den = ts.denominator().coefficients(va, sparse=False)
+    # normalize this.
+    while len(num) < len(den):
+        num.append(0)
+    nrm = den[len(den)-1]
+    for j in xrange(0, len(num)):
+        num[j] /= nrm
+    for j in xrange(0, len(den)):
+        den[j] /= nrm
+
+    # state variables?
+    if len(num) > len(den):
+        raise ValueError("numerator is of greater order than denominator")
+    ssv = len(den) - 1
+
+    def makeMat(rows, cols):
+        return [[0 for c in xrange(0, cols)] for r in xrange(0, rows)]
+
+    # init mats
+    A = makeMat(ssv, ssv)
+    B = makeMat(ssv, 1)
+    C = makeMat(1, ssv)
+    D = makeMat(1, 1)
+
+    # setup A
+    for j in range(0, ssv - 1):
+        A[j][j+1] = 1
+    # setup CCF row in A
+    for j in range(0, ssv):
+        A[ssv-1][j] = -den[j]
+
+    # setup B
+    B[ssv-1][0] = 1
+
+    # setup C
+    for j in xrange(0, ssv):
+        C[0][j] = num[j] - den[j]*num[ssv]
+    # setup D
+    D[0][0] = num[ssv]
+
+    return matrix(A), matrix(B), matrix(C), matrix(D)
+
 def desolve_SS(tvar, U, A, B, C, D, **kwargs):
-    steps = kwargs['step'] if 'step' in kwargs else 200
+    steps = kwargs['steps'] if 'steps' in kwargs else 200
     end = kwargs['end'] if 'end' in kwargs else 1
     start = kwargs['start'] if 'start' in kwargs else 0
     ics = kwargs['ics'] if 'ics' in kwargs else vector([0] * len(A.rows()))
     split = kwargs['split'] if 'split' in kwargs else False
 
-    step = (end - start) / steps
+    step = n((end - start) / steps)
     xv = ics
     tv = start
     tout = []
@@ -120,28 +165,31 @@ def desolve_SS(tvar, U, A, B, C, D, **kwargs):
         return outs
     return tout, out
 
-def evans(expr, kMax=None, accuracy=1, extra=0):
+def evans(expr, kMax=None, accuracy=1, extra=0, **kwargs):
+    emitData = kwargs['data'] if 'data' in kwargs else False
+    debug = kwargs['debug'] if 'debug' in kwargs else False
+
     import itertools
 
     # limits
     smax=.002/(accuracy)
-    smin=smax/3
+    smin=smax/25
     stepMin = 1e-15/(accuracy*accuracy)
     iterMax=20000
 
     va = expr.default_variable()
-    numer = expr.numerator()
-    denom = expr.denominator()
+    numer = expr.numerator().polynomial(CC)
+    denom = expr.denominator().polynomial(CC)
     if kMax == None:
         kMax = round(n(500 * vector(SR(denom).coefficients(s, sparse=False)).norm() / vector(SR(numer).coefficients(s, sparse=False)).norm()))
-
     vzeros = zerosInternal(numer, va, numeric=True)
     vpoles = zerosInternal(denom, va, numeric=True)
     if len(vzeros) + len(vpoles) == 0:
         raise ValueError("No poles or zeros")
 
-    print("Zeros " + str(vzeros))
-    print("Poles " + str(vpoles))
+    if debug:
+        print("Zeros " + str(vzeros))
+        print("Poles " + str(vpoles))
 
     nrm = 2.0 * max([abs(v) for v in vzeros] + [abs(v) for v in vpoles])
     md = denom.degree(va)
@@ -152,16 +200,21 @@ def evans(expr, kMax=None, accuracy=1, extra=0):
 
     routeCount = 0
     poleRoutes = {}
-    # initialize poleRoutes @ k=0
 
+    # initialize poleRoutes @ k=0
     kPoles = zerosInternal(denom, va, numeric=True)
     for v in kPoles:
-        poleRoutes[routeCount] = [v]
+        poleRoutes[routeCount] = {'k':[0], 'v':[v]}
         routeCount += 1
 
-    while kcurr <= kMax and itr < iterMax:
+    lastValidStep = step
+    stepRampFactor = 1
+    stepDerampFactor = 1
+    while kcurr < kMax and itr < iterMax:
         knext = kcurr + step
-        kPoles = zerosInternal(denom+knext*numer, va, numeric=True)
+        if knext > kMax:
+            knext = kMax
+        kPoles = zerosInternal(denom + knext*numer, va, numeric=True)
         # map poles to routes
         kRoutes = None
         kRouteErr = None
@@ -174,7 +227,7 @@ def evans(expr, kMax=None, accuracy=1, extra=0):
                 # pole i maps to route j
                 if j in poleRoutes:
                     # raw distance
-                    kMyErr = abs(poleRoutes[j][-1] - kPoles[i])
+                    kMyErr = abs(poleRoutes[j]['v'][-1] - kPoles[i])
                     kTmpRouteErr += kMyErr
                 else:
                     # static cost for generating new routes
@@ -189,13 +242,13 @@ def evans(expr, kMax=None, accuracy=1, extra=0):
         for j in kRoutes:
             if j in poleRoutes:
                 # raw distance
-                kMyErr = abs(poleRoutes[j][-1] - kRoutes[j])
+                kMyErr = abs(poleRoutes[j]['v'][-1] - kRoutes[j])
 
                 # dist of midpoint from line connecting self and self-2
-                if len(poleRoutes[j]) >= 2:
+                if len(poleRoutes[j]['v']) >= 2:
                     pt1 = kRoutes[j]
-                    pt2 = poleRoutes[j][-2]
-                    test = poleRoutes[j][-1]
+                    pt2 = poleRoutes[j]['v'][-2]
+                    test = poleRoutes[j]['v'][-1]
                     dx=n(real(pt2)-real(pt1))
                     dy=n(imag(pt2)-imag(pt1))
                        
@@ -207,46 +260,64 @@ def evans(expr, kMax=None, accuracy=1, extra=0):
                 kRouteErr = max(kRouteErr, kMyErr)
         kRouteErr /= nrm
 
-        print(str(kcurr) + " + " + str(step) + " = " + str(knext) + "\t\terr=" + str(kRouteErr) + "\t" + str([poleRoutes[k][-1] for k in poleRoutes]))
+        if debug:
+            print(str(kcurr) + " of " + str(kMax) + "\tstep=" + str(step) + "\terr=" + str(kRouteErr) + "\terr_max=" + str(smax) + "\tramps=[" + str(stepRampFactor) + " -" + str(stepDerampFactor) + "]")
         # check err
         if kRouteErr > smax and step > stepMin:
-            step = max(stepMin, step / 2e0)
+            if lastValidStep == None or (step == lastValidStep):
+                lastValidStep = None
+                stepDerampFactor += 1
+                step = max(stepMin, step / (2 ^ stepDerampFactor))
+            else:
+                step = lastValidStep
+                stepRampFactor = 1
+                lastValidStep = None
         else:
+            lastValidStep = step
+            stepDerampFactor = 1
             if kRouteErr < smin:
-                step *= 2e0
+                step *= 2 ^ stepRampFactor
+                stepRampFactor += 1
+            else:
+                stepRampFactor = 1
             for k in kRoutes:
                 v=kRoutes[k]
                 routeCount = max(routeCount, k+1)
                 if k in poleRoutes:
-                    poleRoutes[k].append(v)
+                    poleRoutes[k]['v'].append(v)
+                    poleRoutes[k]['k'].append(knext)
                 else:
-                    poleRoutes[k] = [v]
+                    poleRoutes[k]['v'] = [v]
+                    poleRoutes[k]['k'] = [knext]
             kcurr = knext
         itr = itr + 1
 
     g = Graphics()
     g += tsPoleZero(numer/denom, size=50)
     for k in poleRoutes:
-        g += line(complexToXY(poleRoutes[k]), color='blue', thickness=2)
+        g += line(complexToXY(poleRoutes[k]['v']), color='blue', thickness=2)
 
     # draw asmyptotes
     asymLen = abs(nrm) * (1+extra) * 10
     count = len(vpoles) - len(vzeros)
-    print(str(count) + " asymptotes")
+    if debug:
+        print(str(count) + " asymptotes")
     if count > 0:
         sigma = (sum(vpoles) - sum(vzeros)) / count
-        print("asymptotes start at v=" + str(sigma))
+        if debug:
+            print("asymptotes start at v=" + str(sigma))
         for pole in xrange(0, count):
             theta = pi * (1 + 2*pole) / count
             path = [(real(sigma), imag(sigma)), (real(sigma) + cos(theta) * asymLen, imag(sigma) + sin(theta) * asymLen)]
-            print(str(pole) + " asymp @ " + str(theta) + "\t" + str(path))
+            if debug:
+                print(str(pole) + " asymp @ " + str(theta) + "\t" + str(path))
             g += line(path, linestyle='--', color='red', thickness=4)
     # compute bounds:
     vr = []
     vi = []
     for k in poleRoutes:
-        vr += [real(v) for v in poleRoutes[k]]
-        vi += [imag(v) for v in poleRoutes[k]]
+        vr += [real(v) for v in poleRoutes[k]['v']]
+        vi += [imag(v) for v in poleRoutes[k]['v']]
     vrmax = max(vr)
     vrmin = min(vr)
     vimax = max(vi)
@@ -254,7 +325,10 @@ def evans(expr, kMax=None, accuracy=1, extra=0):
     vrr = vrmax - vrmin
     vir = vimax - vimin
     g.axes_range(max(-nrm * (1+extra), vrmin - vrr * extra), min(nrm * (1+extra), vrmax + vrr * extra), max(-nrm * (1+extra), vimin - vir * extra), min(nrm * (1+extra), vimax + vir * extra))
-    return g
+    if emitData:
+        return g, poleRoutes
+    else:
+        return g
 
 class ControlSystem:
     def __init__(self, tv, sv, *args):
@@ -441,3 +515,20 @@ def rootLocusInfo(CGH, ret=False):
     if not(ret):
         print(rets)
     return rets
+
+def constPercentOvershoot(POS, **kwargs):
+    inverse = kwargs['inverse'] if ('inverse' in kwargs) else False
+    th = 0.472 + 14.11*POS - 205.6*POS^2 + 1115.1*POS^3
+    theta = pi-th
+    if inverse:
+        return [sqrt(imag(s)^2) - real(s) * tan(theta) >= 0]
+    else:
+        return [sqrt(imag(s)^2) - real(s) * tan(theta) <= 0]
+
+def constSettlingTime(Ts, **kwargs):
+    inverse = kwargs['inverse'] if ('inverse' in kwargs) else False
+    sig = -4/Ts
+    if inverse:
+        return [real(s) >= sig]
+    else:
+        return [real(s) <= sig]

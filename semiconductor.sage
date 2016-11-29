@@ -8,6 +8,8 @@ def semiconductorVars(dimen = 1):
 	G['electron_mass'] = 9.1e-31
 	G['speed_of_light'] = 299792458
 	G['boltzmann'] = 1.38064852e-23
+	G['epsilon_naut'] = G['epsilon_0'] = G['vacuum_permittivity'] = 8.854187817e-12
+	G['epsilon'] = var('epsilon')
 	G['T'] = var('T')
 	G['E_F'] = var('E_F')
 	G['E'] = var('E')
@@ -53,8 +55,12 @@ def semiconductorVars(dimen = 1):
 
 	G['D_n'] = G['diffusion_constant_electrons'] = var('D_n')
 	G['D_p'] = G['diffusion_constant_holes'] = var('D_p')
+	G['EE'] = G['electric_field'] = var('EE', latex_name='\\mathcal{E}')
+	G['Jdrift_n'] = G['drift_current_electrons'] = abs(electron_charge) * mobility_electrons * electrons * electric_field
+	G['Jdrift_p'] = G['drift_current_holes'] = abs(electron_charge) * mobility_holes * holes * electric_field
 	G['Jdiff_n'] = G['diffusion_current_electrons'] = electron_charge * diffusion_constant_electrons * -grad(electrons)
 	G['Jdiff_p'] = G['diffusion_current_holes'] = -electron_charge * diffusion_constant_holes * -grad(holes)
+	G['Jcurrent'] = G['total_current'] = Jdrift_n + Jdrift_p + Jdiff_n + Jdiff_p
 
 	G['A'] = G['area'] = var('A')
 	G['L_n'] = G['diffusion_length_n'] = var('L_n')
@@ -62,3 +68,27 @@ def semiconductorVars(dimen = 1):
 	G['V_a'] = G['voltage_bias'] = var('V_a')
 	G['J_ideal_diode'] = abs(electron_charge) * n_i^2 * (D_n / (N_A*L_n) + D_p / (N_D * L_p)) * (exp(abs(electron_charge) * V_a / (boltzmann*T)) - 1)
 	G['I_ideal_diode'] = J_ideal_diode * A
+
+	G['v_bi'] = G['built_in_voltage'] = var('V_bi')
+	G['depletion_n_width'] = G['depletion_electron_width'] = sqrt(2*epsilon/ abs(electron_charge) * (N_A / (N_D * (N_A+N_D))) * v_bi)
+	G['depletion_p_width'] = G['depletion_hole_width'] = sqrt(2*epsilon/ abs(electron_charge) * (N_D / (N_A * (N_A+N_D))) * v_bi)
+	G['depletion_width'] = (depletion_electron_width + depletion_hole_width).simplify_full()
+	G['v_bi_expr'] = G['built_in_voltage_expr'] = boltzmann * T / abs(electron_charge) * ln(N_A * N_D / (n_i ^ 2))
+
+
+	for sfk in ['m', 'i', 's', 'o']:
+		G['work_function_volt_' + sfk] = var('phi_' + sfk)
+		G['work_function_' + sfk] = var('qphi_' + sfk)
+		G['work_function_' + sfk + '_expr'] = abs(electron_charge) * G['work_function_volt_' + sfk]
+		G['electron_affinity_volt_' + sfk] = var('chi_' + sfk)
+		G['electron_affinity_' + sfk] = var('qchi_' + sfk)
+		G['electron_affinity_' + sfk + '_expr'] = abs(electron_charge) * G['electron_affinity_volt_' + sfk]
+
+	schottky_prefactor = ((m_c * abs(electron_charge) * boltzmann^2) / (2*pi^2 * planck_bar^3)) * T^2
+	G['phi_b'] = G['schottky_barrier'] = work_function_volt_m - electron_affinity_volt_s
+	G['qphi_b'] = G['electron_schottky_barrier'] = work_function_m - electron_affinity_s
+	G['J_schottky_diode'] = schottky_prefactor * (exp(abs(electron_charge) * V_a / (boltzmann*T)) - 1) * exp(-electron_schottky_barrier / (boltzmann*T))
+	G['I_schottky_diode'] = area * J_schottky_diode
+
+	
+	G['silicon_vals'] = { n_i: 10^10, epsilon: epsilon_naut * 11.68 }
