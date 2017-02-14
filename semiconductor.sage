@@ -1,14 +1,14 @@
 def semiconductorVars(dimen = 1):
 	G = globals()
 	G['out'] = var('out')
-	G['planck_bar'] = 1.0545718e-34
+	G['planck_bar'] = 1.0545718e-34 # J-s
 	G['planck'] = planck_bar*2*pi
-	G['electron_charge'] = -1.60218e-19
-	G['electron_volt'] = -electron_charge
-	G['electron_mass'] = 9.1e-31
-	G['speed_of_light'] = 299792458
-	G['boltzmann'] = 1.38064852e-23
-	G['epsilon_naut'] = G['epsilon_0'] = G['vacuum_permittivity'] = 8.854187817e-12
+	G['electron_charge'] = -1.60218e-19 # C
+	G['electron_volt'] = abs(electron_charge) # CV = J
+	G['electron_mass'] = 9.1e-31 # kg
+	G['speed_of_light'] = 299792458 # m/s
+	G['boltzmann'] = 1.38064852e-23 # m^2 kg s^-2 K^-1
+	G['epsilon_naut'] = G['epsilon_0'] = G['vacuum_permittivity'] = 8.854187817e-12 # F/m
 	G['epsilon'] = var('epsilon')
 	G['T'] = var('T')
 	G['E_F'] = var('E_F')
@@ -76,7 +76,8 @@ def semiconductorVars(dimen = 1):
 	G['v_bi_expr'] = G['built_in_voltage_expr'] = boltzmann * T / abs(electron_charge) * ln(N_A * N_D / (n_i ^ 2))
 
 
-	for sfk in ['m', 'i', 's', 'o']:
+	for sfk in ['m', 'i', 's', 'ox']:
+		G['epsilon_' + sfk] = var('epsilon_' + sfk)
 		G['work_function_volt_' + sfk] = var('phi_' + sfk)
 		G['work_function_' + sfk] = var('qphi_' + sfk)
 		G['work_function_' + sfk + '_expr'] = abs(electron_charge) * G['work_function_volt_' + sfk]
@@ -90,5 +91,12 @@ def semiconductorVars(dimen = 1):
 	G['J_schottky_diode'] = schottky_prefactor * (exp(abs(electron_charge) * V_a / (boltzmann*T)) - 1) * exp(-electron_schottky_barrier / (boltzmann*T))
 	G['I_schottky_diode'] = area * J_schottky_diode
 
+	G['t_ox'] = G['oxide_thickness'] = var('t_ox')
+	G['mos_surface_potential_p'] = (boltzmann * T / abs(electron_charge)) * ln(num_acceptors / n_i)
+	G['mos_threshold_voltage_p'] = 2*mos_surface_potential_p + (epsilon_s / epsilon_ox) * oxide_thickness * sqrt((2 * abs(electron_charge) * num_acceptors / epsilon_s) * 2 * mos_surface_potential_p)
+
+	G['mos_surface_potential_n'] = (boltzmann * T / abs(electron_charge)) * ln(num_donors / n_i)
+	G['mos_threshold_voltage_n'] = 2*mos_surface_potential_n + (epsilon_s / epsilon_ox) * oxide_thickness * sqrt((2 * abs(electron_charge) * num_donors / epsilon_s) * 2 * mos_surface_potential_n)
 	
-	G['silicon_vals'] = { n_i: 10^10, epsilon: epsilon_naut * 11.68 }
+	G['silicon_vals'] = { epsilon: epsilon_naut * 11.68 }
+	G['silicon_dioxide_vals'] = { epsilon: epsilon_naut * 3.9 }
